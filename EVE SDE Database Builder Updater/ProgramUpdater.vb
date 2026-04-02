@@ -1,6 +1,8 @@
 ﻿Imports System.IO
+
+Imports System.Net.Http
+Imports System.Security.Cryptography
 Imports System.Xml
-Imports System.Net
 
 Public Enum UpdateCheckResult
     UpdateError = -1
@@ -220,55 +222,39 @@ DownloadError:
     ''' <param name="DownloadURL">URL to download the file</param>
     ''' <param name="FileName">File name of downloaded file</param>
     ''' <returns>File Name of where the downloaded file was saved.</returns>
-    Public Function DownloadFileFromServer(ByVal DownloadURL As String, ByVal FileName As String) As String
-        ' Creating the request And getting the response
-        Dim Response As HttpWebResponse
-        Dim Request As HttpWebRequest
+    Public Async Function DownloadFileFromServerAsync(DownloadURL As String, FileName As String) As Task(Of String)
+        Try
+            Using client As New HttpClient()
+                ' Optional: disable proxy like your old code
+                Dim handler = New HttpClientHandler() With {
+                .Proxy = Nothing,
+                .UseProxy = False
+            }
 
-        ' For reading in chunks of data
-        Dim readBytes(4095) As Byte
-        ' Save in root directory
-        Dim writeStream As New FileStream(FileName, FileMode.Create)
-        Dim bytesread As Integer
+                Using http As New HttpClient(handler)
+                    Dim data As Byte() = Await http.GetByteArrayAsync(DownloadURL)
+                    Await File.WriteAllBytesAsync(FileName, data)
+                End Using
+            End Using
 
-        Try 'Checks if the file exist
-            Request = DirectCast(HttpWebRequest.Create(DownloadURL), HttpWebRequest)
-            Request.Proxy = Nothing
-            Request.Credentials = CredentialCache.DefaultCredentials ' Added 9/27 to attempt to fix error: (407) Proxy Authentication Required.
-            Request.Timeout = 50000
-            Response = CType(Request.GetResponse, HttpWebResponse)
+            ' Normalize line endings for .txt files
+            If FileName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) Then
+                Dim text = Await File.ReadAllTextAsync(FileName)
+                text = text.Replace(Chr(10), vbCrLf)
+                Await File.WriteAllTextAsync(FileName, text)
+            End If
+
+            Return FileName
+
         Catch ex As Exception
-            ' Show error and exit
-            'Close the streams
-            writeStream.Close()
-            MsgBox("An error occurred while downloading update file: " & ex.Message, vbCritical, Application.ProductName)
+            MsgBox("An error occurred while downloading update file: " & ex.Message,
+               vbCritical, Application.ProductName)
             Return ""
         End Try
+    End Function
 
-        ' Loop through and get the file in chunks, save out
-        Do
-            bytesread = Response.GetResponseStream.Read(readBytes, 0, 4096)
-
-            ' No more bytes to read
-            If bytesread = 0 Then Exit Do
-
-            writeStream.Write(readBytes, 0, bytesread)
-        Loop
-
-        'Close the streams
-        Response.GetResponseStream.Close()
-        writeStream.Close()
-
-        ' Finally, check if the file is xml or text and adjust the lf to crlf (git saves as unix or lf only)
-        If FileName.Contains(".txt") Then 'Or FileName.Contains(".xml") Then
-            Dim FileText As String = File.ReadAllText(FileName)
-            FileText = FileText.Replace(Chr(10), vbCrLf)
-            ' Write the file back out if it's been updated
-            File.WriteAllText(FileName, FileText)
-        End If
-
-        Return FileName
-
+    Public Function DownloadFileFromServer(url As String, fileName As String) As String
+        Return DownloadFileFromServerAsync(url, fileName).GetAwaiter().GetResult()
     End Function
 
     ''' <summary>
@@ -276,26 +262,18 @@ DownloadError:
     ''' </summary>
     ''' <param name="filepath">File to calculate an MD5 for</param>
     ''' <returns>The formatted hash as a string</returns>
-    Public Function MD5CalcFile(ByVal filepath As String) As String
 
-        ' Open file (as read-only) - If it's not there, return ""
-        If IO.File.Exists(filepath) Then
-            Using reader As New System.IO.FileStream(filepath, IO.FileMode.Open, IO.FileAccess.Read)
-                Using md5 As New System.Security.Cryptography.MD5CryptoServiceProvider
-
-                    ' hash contents of this stream
-                    Dim hash() As Byte = md5.ComputeHash(reader)
-
-                    ' return formatted hash
-                    Return ByteArrayToString(hash)
-
-                End Using
-            End Using
+    Public Function MD5CalcFile(filepath As String) As String
+        If Not IO.File.Exists(filepath) Then
+            Return ""
         End If
 
-        ' Something went wrong
-        Return ""
-
+        Using stream As New IO.FileStream(filepath, IO.FileMode.Open, IO.FileAccess.Read, IO.FileShare.Read)
+            Using md5 As MD5 = MD5.Create()
+                Dim hash As Byte() = md5.ComputeHash(stream)
+                Return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant()
+            End Using
+        End Using
     End Function
 
     ''' <summary>

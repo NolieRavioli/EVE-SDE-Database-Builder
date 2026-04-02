@@ -1,5 +1,5 @@
-﻿Imports System.Security.AccessControl
-Imports System.IO
+﻿Imports System.IO
+Imports System.Security.AccessControl
 Imports System.Security.Principal
 
 ''' <summary>
@@ -71,13 +71,29 @@ Public Class DBFilesBase
     ''' <param name="FileDirectory">Directory where the bulk insert CSV files will be stored.</param>
     Public Sub SetCSVDirectory(ByRef FileDirectory As String)
 
-        If Directory.Exists(FileDirectory) Then
-            Call Directory.Delete(FileDirectory, True)
+        CreateNewDirectory(FileDirectory)
+
+        If Not Directory.Exists(FileDirectory) Then
+            Directory.CreateDirectory(FileDirectory)
         End If
 
-        Dim DS As New DirectorySecurity
-        DS.AddAccessRule(New FileSystemAccessRule(New SecurityIdentifier(WellKnownSidType.WorldSid, Nothing), FileSystemRights.FullControl, InheritanceFlags.ContainerInherit Or InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow))
-        Directory.CreateDirectory(FileDirectory, DS)
+        Try
+            Dim ds As New DirectorySecurity()
+            ds.AddAccessRule(New FileSystemAccessRule(
+            New SecurityIdentifier(WellKnownSidType.WorldSid, Nothing),
+            FileSystemRights.FullControl,
+            InheritanceFlags.ContainerInherit Or InheritanceFlags.ObjectInherit,
+            PropagationFlags.None,
+            AccessControlType.Allow))
+
+            Dim di As New DirectoryInfo(FileDirectory)
+            di.SetAccessControl(ds)
+
+        Catch ex As Exception
+            ' Log or ignore depending on your needs
+            ' Many folders simply cannot have ACLs modified
+        End Try
+
         CSVDirectory = FileDirectory
 
     End Sub
@@ -126,6 +142,33 @@ Public Class DBFilesBase
 
         Return New DBField(FieldName, ReturnFieldValue, FieldDataType)
 
+    End Function
+
+    ''' <summary>
+    ''' Finalize the data import process. To be overridden in derived classes if needed.
+    ''' </summary>
+    Public Overridable Sub FinalizeDataImport()
+        Application.DoEvents()
+    End Sub
+
+    Public Overridable Function BuildOrderedRecord(TableName As String, fields As List(Of DBField)) As List(Of DBField)
+        Return fields
+    End Function
+
+    Public Function ToRoman(value As Integer) As String
+        Dim romanMap As New Dictionary(Of Integer, String) From {
+        {1000, "M"}, {900, "CM"}, {500, "D"}, {400, "CD"},
+        {100, "C"}, {90, "XC"}, {50, "L"}, {40, "XL"},
+        {10, "X"}, {9, "IX"}, {5, "V"}, {4, "IV"}, {1, "I"}}
+
+        Dim result As String = ""
+        For Each kvp In romanMap
+            While value >= kvp.Key
+                result &= kvp.Value
+                value -= kvp.Key
+            End While
+        Next
+        Return result
     End Function
 
 End Class
@@ -200,4 +243,5 @@ Public Enum DatabaseType
     CSV = 4
     MySQL = 5
     PostgreSQL = 6
+    JSON = 7
 End Enum

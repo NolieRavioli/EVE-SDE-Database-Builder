@@ -1,6 +1,5 @@
 ﻿Imports System.IO
 Imports System.Xml
-Imports System.Net
 
 Public Enum UpdateCheckResult
     UpdateError = -1
@@ -19,8 +18,6 @@ Public Class ProgramUpdater
 
     Public Const XMLLatestVersionFileName As String = "LatestVersionESDEDB.xml"
     Public Const UpdaterFileName As String = "ESDEDB Updater.exe"
-    Public Const UpdatePath As String = "Updates\"
-    Public UserWorkingFolder As String = "" ' Where the DB and updater and anything that changes files will be
     Public UpdaterFilePath As String = "" ' Where the update files are stored
 
     ' File Path
@@ -29,19 +26,15 @@ Public Class ProgramUpdater
     ' When constructed, it will load the settings XML file into the class
     Public Sub New()
 
-        UpdaterFilePath = UpdatePath
+        UpdaterFilePath = Path.Combine(EXEFileFolder, "Updates")
 
-        ' Create the updates folder
-        If Directory.Exists(UpdaterFilePath) Then
-            ' Delete what is there and replace
-            Dim ImageDir As New DirectoryInfo(UpdaterFilePath)
-            ImageDir.Delete(True)
-        End If
+        ' Delete what is there and replace
+        Call DeleteMyDirectory(UpdaterFilePath)
 
         Directory.CreateDirectory(UpdaterFilePath)
 
         ' Get the newest updatefile from server
-        ServerXMLLastUpdatePath = DownloadFileFromServer(XMLUpdateFileURL, UpdaterFilePath & XMLLatestVersionFileName)
+        ServerXMLLastUpdatePath = DownloadFileFromServer(XMLUpdateFileURL, Path.Combine(UpdaterFilePath, XMLLatestVersionFileName))
 
     End Sub
 
@@ -53,8 +46,7 @@ Public Class ProgramUpdater
         On Error Resume Next
 
         ' Delete the updates folder (new one will be made in updater)
-        Dim ImageDir As New DirectoryInfo(UpdaterFilePath)
-        ImageDir.Delete(True)
+        DeleteMyDirectory(UpdaterFilePath)
 
     End Sub
 
@@ -149,17 +141,18 @@ DownloadError:
         Dim LocalFileMD5 As String
         Dim ServerFilePath As String
         Dim fi As FileInfo
+        Dim TempFilePath = Path.Combine(EXEFileFolder, Filename)
 
         ' Get the local updater MD5, if not found, we run update anyway
-        LocalFileMD5 = MD5CalcFile(UserWorkingFolder & UpdaterFileName)
+        LocalFileMD5 = MD5CalcFile(Path.Combine(EXEFileFolder, UpdaterFileName))
 
         If LocalFileMD5 <> ServerFileMD5 Then
             ' Update the updater file, download the new file
-            ServerFilePath = DownloadFileFromServer(ServerFileURL, UpdaterFilePath & Filename)
+            ServerFilePath = DownloadFileFromServer(ServerFileURL, XMLUpdateFileURL, Path.Combine(UpdaterFilePath, Filename))
 
             If MD5CalcFile(ServerFilePath) <> ServerFileMD5 Then
                 ' Try again
-                ServerFilePath = DownloadFileFromServer(ServerFileURL, UpdaterFilePath & Filename)
+                ServerFilePath = DownloadFileFromServer(ServerFileURL, Path.Combine(UpdaterFilePath, Filename))
 
                 If MD5CalcFile(ServerFilePath) <> ServerFileMD5 Or ServerFilePath = "" Then
                     ' Download error, just leave because we want this update to go through before running
@@ -168,13 +161,13 @@ DownloadError:
             End If
 
             ' Delete the old file, rename the new
-            If File.Exists(UserWorkingFolder & Filename) Then
-                File.Delete(UserWorkingFolder & Filename)
+            If File.Exists(TempFilePath) Then
+                File.Delete(TempFilePath)
             End If
 
             ' Move the downloaded file
             fi = New FileInfo(ServerFilePath)
-            fi.MoveTo(UserWorkingFolder & Filename)
+            fi.MoveTo(TempFilePath)
         End If
 
         Return ""
@@ -192,11 +185,11 @@ DownloadError:
         Try
 
             ' Get the hash of the local XML
-            LocalMD5 = MD5CalcFile(XMLLatestVersionFileName)
+            LocalMD5 = MD5CalcFile(Path.Combine(EXEFileFolder, XMLLatestVersionFileName))
 
             If ServerXMLLastUpdatePath <> "" Then
                 ' Get the hash of the server XML
-                ServerMD5 = MD5CalcFile(UpdaterFilePath & XMLLatestVersionFileName)
+                ServerMD5 = MD5CalcFile(Path.Combine(UpdaterFilePath, XMLLatestVersionFileName))
             Else
                 Return UpdateCheckResult.UpdateError
             End If
@@ -212,107 +205,6 @@ DownloadError:
             ' File didn't download, so either try again later or some other error that is unhandled
             Return UpdateCheckResult.UpdateError
         End Try
-    End Function
-
-    '''' <summary>
-    '''' Downloads the sent file from server and saves it to the root directory as the sent file name
-    '''' </summary>
-    '''' <param name="DownloadURL">URL to download the file</param>
-    '''' <param name="FileName">File name of downloaded file</param>
-    '''' <returns>File Name of where the downloaded file was saved.</returns>
-    'Private Function DownloadFileFromServer(ByVal DownloadURL As String, ByVal FileName As String) As String
-    '    ' Creating the request And getting the response
-    '    Dim Response As HttpWebResponse
-    '    Dim Request As HttpWebRequest
-
-    '    ' For reading in chunks of data
-    '    Dim readBytes(4095) As Byte
-    '    ' Save in root directory
-    '    Dim writeStream As New FileStream(FileName, FileMode.Create)
-    '    Dim bytesread As Integer
-
-    '    Try 'Checks if the file exist
-    '        Request = DirectCast(HttpWebRequest.Create(DownloadURL), HttpWebRequest)
-    '        Request.Proxy = Nothing
-    '        Request.Credentials = CredentialCache.DefaultCredentials ' Added 9/27 to attempt to fix error: (407) Proxy Authentication Required.
-    '        Request.Timeout = 50000
-    '        Response = CType(Request.GetResponse, HttpWebResponse)
-    '    Catch ex As Exception
-    '        ' Show error and exit
-    '        'Close the streams
-    '        writeStream.Close()
-    '        MsgBox("An error occurred while downloading update file: " & ex.Message, vbCritical, Application.ProductName)
-    '        Return ""
-    '    End Try
-
-    '    ' Loop through and get the file in chunks, save out
-    '    Do
-    '        bytesread = Response.GetResponseStream.Read(readBytes, 0, 4096)
-
-    '        ' No more bytes to read
-    '        If bytesread = 0 Then Exit Do
-
-    '        writeStream.Write(readBytes, 0, bytesread)
-    '    Loop
-
-    '    'Close the streams
-    '    Response.GetResponseStream.Close()
-    '    writeStream.Close()
-
-    '    ' Finally, check if the file is xml or text and adjust the lf to crlf (git saves as unix or lf only)
-    '    If FileName.Contains(".txt") Then 'Or FileName.Contains(".xml") Then
-    '        Dim FileText As String = File.ReadAllText(FileName)
-    '        FileText = FileText.Replace(Chr(10), vbCrLf)
-    '        ' Write the file back out if it's been updated
-    '        File.WriteAllText(FileName, FileText)
-    '    End If
-
-    '    Return FileName
-
-    'End Function
-
-    ''' <summary>
-    ''' Calculates the MD5 hash for the sent file.
-    ''' </summary>
-    ''' <param name="filepath">File to calculate an MD5 for</param>
-    ''' <returns>The formatted hash as a string</returns>
-    Public Function MD5CalcFile(ByVal filepath As String) As String
-
-        ' Open file (as read-only) - If it's not there, return ""
-        If IO.File.Exists(filepath) Then
-            Using reader As New System.IO.FileStream(filepath, IO.FileMode.Open, IO.FileAccess.Read)
-                Using md5 As New System.Security.Cryptography.MD5CryptoServiceProvider
-
-                    ' hash contents of this stream
-                    Dim hash() As Byte = md5.ComputeHash(reader)
-
-                    ' return formatted hash
-                    Return ByteArrayToString(hash)
-
-                End Using
-            End Using
-        End If
-
-        ' Something went wrong
-        Return ""
-
-    End Function
-
-    ''' <summary>
-    ''' Converts byte array to a hex string for MD5 hash
-    ''' </summary>
-    ''' <param name="arrInput">Array of bytes</param>
-    ''' <returns>Hex string of bytes input</returns>
-    Private Function ByteArrayToString(ByVal arrInput() As Byte) As String
-
-        Dim sb As New System.Text.StringBuilder(arrInput.Length * 2)
-
-        For i As Integer = 0 To arrInput.Length - 1
-            sb.Append(arrInput(i).ToString("X2"))
-        Next
-
-        Return sb.ToString().ToLower
-
     End Function
 
 End Class

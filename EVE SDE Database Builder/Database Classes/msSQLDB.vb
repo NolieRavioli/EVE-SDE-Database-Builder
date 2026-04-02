@@ -1,5 +1,5 @@
 ﻿
-Imports System.Data.SqlClient
+Imports Microsoft.Data.SqlClient
 
 ''' <summary>
 ''' Class to create a Microsoft SQL Server DB and insert data into it.
@@ -12,7 +12,8 @@ Public Class msSQLDB
     Private ReadOnly DBUserName As String
     Private ReadOnly DBPassword As String
     Private ReadOnly DBName As String
-    Private ReadOnly TempDB As New LocalDatabase ' for doing bulk inserts
+    Private ReadOnly InternalDB As New LocalDatabase ' for doing bulk inserts
+
 
     ''' <summary>
     ''' Constructor class for a Microsoft SQL Server database. Class connects to the server name sent.
@@ -21,6 +22,7 @@ Public Class msSQLDB
     ''' <param name="DatabaseName">Name of the database to open or create.</param>
     ''' <param name="InstanceName">Name of the Microsoft SQL Server (e.g. localhost')</param>
     ''' <param name="Success">True if the database successfully created.</param>
+
     Public Sub New(ByVal DatabaseName As String, ByVal InstanceName As String,
                    ByVal UserName As String, ByVal Password As String, ByRef Success As Boolean)
         MyBase.New(DatabaseName, DatabaseType.SQLServer)
@@ -77,6 +79,7 @@ Public Class msSQLDB
     ''' the database name given for use with the class.
     ''' </summary>
     ''' <returns>Returns a SqlConnection for use.</returns>
+
     Private Function DBConnectionRef() As SqlConnection
 
         ' Open the connection for reference
@@ -101,6 +104,7 @@ Public Class msSQLDB
     ''' Closes and disposes the referenced database.
     ''' </summary>
     ''' <param name="RefDB">The database to close.</param>
+
     Public Sub CloseDB(ByRef RefDB As SqlConnection)
         On Error Resume Next
         SqlConnection.ClearAllPools()
@@ -114,6 +118,7 @@ Public Class msSQLDB
     ''' Executes the sent SQL on the main database for the class.
     ''' </summary>
     ''' <param name="SQL">SQL query to execute.</param>
+
     Public Sub ExecuteNonQuerySQL(ByVal SQL As String)
         Dim DBRef As SqlConnection = DBConnectionRef()
         Dim Command As New SqlCommand(SQL, DBRef)
@@ -232,6 +237,9 @@ Public Class msSQLDB
 
         Call ExecuteNonQuerySQL(SQL)
 
+        ' Save this registration
+        InternalDB.RegisterSchema(TableName, TableStructure)
+
     End Sub
 
     ''' <summary>
@@ -250,21 +258,21 @@ Public Class msSQLDB
 
         ' Unique index
         If Unique Then
-            SQL &=  "UNIQUE" & SPACE
+            SQL &= "UNIQUE" & SPACE
         End If
 
         ' Cluster type
         If Clustered Then
-            SQL &=  "CLUSTERED" & SPACE
+            SQL &= "CLUSTERED" & SPACE
         Else
-            SQL &=  "NONCLUSTERED" & SPACE
+            SQL &= "NONCLUSTERED" & SPACE
         End If
 
-        SQL &=  String.Format("INDEX {0} ON {1} (", IndexName, TableName)
+        SQL &= String.Format("INDEX {0} ON {1} (", IndexName, TableName)
 
         ' Build index fields
         For Each Field In IndexFields
-            SQL &=  Field & COMMA
+            SQL &= Field & COMMA
         Next
 
         ' Strip the last comman
@@ -283,7 +291,6 @@ Public Class msSQLDB
     ''' <param name="ImmediateInsert">If we immediately insert the record or do a bulk insert.</param>
     Public Sub InsertRecord(ByVal TableName As String, ByVal Record As List(Of DBField), Optional ByVal ImmediateInsert As Boolean = False)
 
-        ' If it's a translation table, then save it to the database directly - no bulk insert
         If ImmediateInsert Then
             Dim Fields As String = ""
             Dim FieldValues As String = ""
@@ -301,7 +308,7 @@ Public Class msSQLDB
 
         Else
             ' Save locally for bulk insert
-            Call TempDB.InsertRecord(TableName, Record)
+            Call InternalDB.InsertRecord(TableName, Record)
         End If
 
     End Sub
@@ -309,42 +316,19 @@ Public Class msSQLDB
     ''' <summary>
     ''' Finalizes the data import. If translation tables were used, they will be imported here.
     ''' </summary>
-    ''' <param name="Translator">YAMLTranslations object to get stored tables from.</param>
-    ''' <param name="TranslationTableImportList">List of translation tables to import.</param>
-    Public Sub FinalizeDataImport(ByRef Translator As YAMLTranslations, ByVal TranslationTableImportList As List(Of String))
+    Public Overrides Sub FinalizeDataImport()
         Dim DBREf As SqlConnection = DBConnectionRef()
-        Dim Tables As List(Of DataTable) = Translator.TranslationTables.GetTables
-
-        Call InitalizeMainProgressBar(Tables.Count, "Importing Translation data...")
-
-        ' Import the translation tables only if they were selected - otherwise skip
-        For i = 0 To Translator.TranslationTables.GetTables.Count - 1
-            If TranslationTableImportList.Contains(Tables(i).TableName) Then
-                Using copy As New SqlBulkCopy(DBREf)
-                    Call UpdateMainProgressBar(i, "Importing " & Tables(i).TableName)
-                    ' Set up options
-                    copy.BulkCopyTimeout = 0 ' Don't timeout
-                    copy.BatchSize = 1000 ' 1000 rows at a time
-                    ' Inserts should map directly to table
-                    For j = 0 To Tables(i).Columns.Count - 1
-                        copy.ColumnMappings.Add(j, j)
-                    Next
-                    copy.DestinationTableName = Tables(i).TableName
-                    copy.WriteToServer(Tables(i))
-
-                End Using
-            End If
-        Next
+        Dim Tables As List(Of DataTable)
 
         Call ClearMainProgressBar()
 
-        Tables = TempDB.GetTables
+        Tables = InternalDB.GetTables
         Call InitalizeMainProgressBar(Tables.Count, "Importing Bulk data...")
 
         ' Now insert each table from files
         For i = 0 To Tables.Count - 1
             Using copy As New SqlBulkCopy(DBREf)
-                Call UpdateMainProgressBar(i, "Importing " & Tables(i).TableName)
+                Call UpdateMainProgressBar(i, "Uploading " & Tables(i).TableName)
                 ' Set up options
                 copy.BulkCopyTimeout = 0 ' Don't timeout
                 copy.BatchSize = 1000 ' 1000 rows at a time

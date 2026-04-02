@@ -1,9 +1,9 @@
 ﻿
-Imports System.IO
-Imports System.Xml
 Imports System.ComponentModel
 Imports System.Globalization ' For culture info
+Imports System.IO
 Imports System.Threading
+Imports System.Xml
 
 Delegate Sub UpdateStatusSafe(ByVal pgBarVisible As Boolean, ByVal lblText As String)
 Delegate Sub UpdatePGBarSafe(ByVal pgBarValue As Integer)

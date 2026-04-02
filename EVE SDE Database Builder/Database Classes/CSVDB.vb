@@ -1,6 +1,7 @@
 ﻿
 Imports System.IO
 Imports System.Security.AccessControl
+Imports System.Text
 
 ''' <summary>
 ''' Class to create a CSV "database" and insert data into it.
@@ -14,6 +15,8 @@ Public Class CSVDB
     Private Const CSVExtention As String = ".csv"
     Private ReadOnly UseNullforBlanks As Boolean = False
 
+    Private CSVColumnOrder As New Dictionary(Of String, List(Of String))
+
     ''' <summary>
     ''' Constructor class for a CSV "database". 
     ''' </summary>
@@ -22,16 +25,16 @@ Public Class CSVDB
     ''' <param name="AllowDirectoryFullAccess">Optional boolean to allow access to the full directory to allow other DB classes access to the folder</param>
     ''' <param name="ExportasSSV">Export the data in Semi-colon separated values for EU users</param>
     Public Sub New(ByVal DatabaseFileNameandPath As String, ByRef Success As Boolean, ByVal InsertNullforBlankValues As Boolean,
-                   Optional ByVal AllowDirectoryFullAccess As Boolean = False, Optional ByVal ExportasSSV As Boolean = False)
+                   Optional ByVal AllowDirectoryFullAccess As Boolean = False, Optional ByVal ExportasSSV As Boolean = False,
+                   Optional ByVal CreateDirectory As Boolean = True)
         MyBase.New(DatabaseFileNameandPath, DatabaseType.CSV)
 
         Call InitalizeMainProgressBar(0, "Initializing Database..")
 
         Try
             ' Build a new folder for the 'database' 
-            If Not Directory.Exists(DatabaseFileNameandPath) Then
-                Directory.CreateDirectory(DatabaseFileNameandPath)
-                Application.DoEvents()
+            If CreateDirectory Then
+                Call CreateNewDirectory(DatabaseFileNameandPath)
             End If
 
             ' Set the folder access if needed (mainly for postgresql bulk import)
@@ -43,7 +46,11 @@ Public Class CSVDB
                 FolderInfo.SetAccessControl(FolderSecurity)
             End If
 
-            DB = DatabaseFileNameandPath & "\"
+            If Right(DatabaseFileNameandPath, 1) <> "\" Then
+                DB = DatabaseFileNameandPath & "\"
+            Else
+                DB = DatabaseFileNameandPath
+            End If
 
             If ExportasSSV Then
                 DELIMITER = SEMICOLON
@@ -105,6 +112,7 @@ Public Class CSVDB
     Public Sub CreateTable(ByVal TableName As String, ByVal TableStructure As List(Of DBTableField))
         Dim TableStream As StreamWriter
         Dim OutputText As String = ""
+        Dim colOrder As New List(Of String)
 
         ' "drop table" if it exists
         If File.Exists(DB & TableName & CSVExtention) Then
@@ -119,17 +127,18 @@ Public Class CSVDB
             Exit Sub
         End Try
 
-        ' Add fields
+        ' Add fields - cacheing each
         For Each Field In TableStructure
             With Field
                 OutputText = OutputText & Field.FieldName & DELIMITER
             End With
+            colOrder.Add(Field.FieldName)
         Next
 
-        ' Strip last DELIMITER
-        OutputText = StripLastCharacter(OutputText)
+        ' Save this for future inserts
+        CSVColumnOrder(TableName) = colOrder
 
-        TableStream.WriteLine(OutputText)
+        TableStream.WriteLine(String.Join(DELIMITER, StripLastCharacter(OutputText)))
         TableStream.Flush()
         TableStream.Close()
         TableStream.Dispose()
@@ -177,94 +186,70 @@ Public Class CSVDB
     ''' <param name="TableName">Table to insert records.</param>
     ''' <param name="Record">List of table fields that make up the record.</param>
     Public Sub InsertRecord(ByVal TableName As String, Record As List(Of DBField))
-        Dim TableStream As StreamWriter
-        Dim OutputText As String = ""
+        Dim filePath As String = DB & TableName & CSVExtention
+        Dim TableStream As StreamWriter = File.AppendText(filePath)
+        Dim OutputText As New StringBuilder()
 
-        ' Open the file
-        Try
-            TableStream = File.AppendText(DB & TableName & CSVExtention)
-        Catch ex As Exception
-            ShowErrorMessage(ex)
-            Exit Sub
-        End Try
+        ' Get the correct column order
+        Dim order = CSVColumnOrder(TableName)
 
-        For Each Field In Record
-            If (Field.FieldType = FieldType.double_type Or Field.FieldType = FieldType.float_type Or Field.FieldType = FieldType.real_type) And DELIMITER = SEMICOLON Then
-                ' Need to format for comma as a decimal
-                Field.FieldValue = ConvertUStoEUDecimal(Field.FieldValue)
+        ' Record is assumed to be in the same order as the schema
+        ' If not, reorder it ONCE when building the DBField list
+        For i = 0 To order.Count - 1
+            Dim field = Record(i)
+
+            Dim value = field.FieldValue
+
+            ' Decimal formatting
+            If (field.FieldType = FieldType.double_type Or
+            field.FieldType = FieldType.float_type Or
+            field.FieldType = FieldType.real_type) AndAlso DELIMITER = SEMICOLON Then
+
+                value = ConvertUStoEUDecimal(value)
             End If
 
-            If UseNullforBlanks And Field.FieldValue = "" Then
-                Field.FieldValue = NULL
+            ' NULL handling
+            If UseNullforBlanks AndAlso (value Is Nothing OrElse value.ToString() = "") Then
+                value = NULL
             End If
 
-            OutputText = OutputText & Field.FieldValue & DELIMITER
+            OutputText.Append(value)
+            OutputText.Append(DELIMITER)
         Next
 
-        ' Strip last seperator
-        OutputText = StripLastCharacter(OutputText)
+        ' Remove last delimiter
+        OutputText.Length -= 1
 
-        TableStream.WriteLine(OutputText)
+        TableStream.WriteLine(OutputText.ToString())
         TableStream.Flush()
         TableStream.Close()
-        TableStream.Dispose()
-
     End Sub
 
-    ''' <summary>
-    ''' Finalizes the data import. If translation tables were used, they will be imported here.
-    ''' </summary>
-    ''' <param name="Translator">YAMLTranslations object to get stored tables from.</param>
-    ''' <param name="TranslationTableImportList">List of translation tables to import.</param>
-    Public Sub FinalizeDataImport(ByRef Translator As YAMLTranslations, ByVal TranslationTableImportList As List(Of String))
-        Dim Tables As List(Of DataTable) = Translator.TranslationTables.GetTables
-        Dim i As Integer
+    Public Overrides Function BuildOrderedRecord(TableName As String, fields As List(Of DBField)) As List(Of DBField)
+        Dim ordered As New List(Of DBField)
+        Dim map As New Dictionary(Of String, DBField)(StringComparer.OrdinalIgnoreCase)
 
-        Call InitalizeMainProgressBar(Tables.Count, "Importing Translation data...")
+        ' Build lookup once
+        For Each f In fields
+            map(f.FieldName) = f
+        Next
 
-        ' Import the translation tables only if they were selected - otherwise skip
-        For Each TTable In Tables
-            i = 0
-            If TranslationTableImportList.Contains(TTable.TableName) Then
-
-                Call UpdateMainProgressBar(i, "Importing " & TTable.TableName)
-
-                For Each row As DataRow In TTable.Rows
-                    Dim DataFields As New List(Of DBField)
-
-                    If TTable.TableName = YAMLTranslations.trnTranslationColumnsTable Then
-                        DataFields.Add(BuildDatabaseField("columnName", CType(row.Item(0), Object), FieldType.nvarchar_type))
-                        DataFields.Add(BuildDatabaseField("masterID", CType(row.Item(1), Object), FieldType.nvarchar_type))
-                        DataFields.Add(BuildDatabaseField("tableName", CType(row.Item(2), Object), FieldType.nvarchar_type))
-                        DataFields.Add(BuildDatabaseField("tcGroupID", CType(row.Item(3), Object), FieldType.smallint_type))
-                        DataFields.Add(BuildDatabaseField("tcID", CType(row.Item(4), Object), FieldType.smallint_type))
-
-                    ElseIf TTable.TableName = YAMLTranslations.trnTranslationLanguagesTable Then
-                        DataFields.Add(BuildDatabaseField("languageID", CType(row.Item(0), Object), FieldType.varchar_type))
-                        DataFields.Add(BuildDatabaseField("languageName", CType(row.Item(1), Object), FieldType.nvarchar_type))
-
-                    ElseIf TTable.TableName = YAMLTranslations.trnTranslationsTable Then
-                        DataFields.Add(BuildDatabaseField("keyID", CType(row.Item(0), Object), FieldType.int_type))
-                        DataFields.Add(BuildDatabaseField("languageID", CType(row.Item(1), Object), FieldType.varchar_type))
-                        DataFields.Add(BuildDatabaseField("tcID", CType(row.Item(2), Object), FieldType.smallint_type))
-                        DataFields.Add(BuildDatabaseField("text", CType(row.Item(3), Object), FieldType.nvarchar_type))
-
-                    End If
-
-                    Call InsertRecord(TTable.TableName, DataFields)
-
-                Next
-
+        ' Build full ordered list
+        For Each colName In CSVColumnOrder(TableName)
+            If map.ContainsKey(colName) Then
+                ordered.Add(map(colName))
             Else
-                ' "drop table" if it exists
-                If File.Exists(DB & TTable.TableName & CSVExtention) Then
-                    File.Delete(DB & TTable.TableName & CSVExtention)
-                End If
+                ' Missing field → insert NULL
+                ordered.Add(New DBField With {
+                .FieldName = colName,
+                .FieldValue = "",
+                .FieldType = FieldType.text_type   ' or whatever default makes sense
+            })
             End If
         Next
 
-        Call ClearMainProgressBar()
+        Return ordered
+    End Function
 
-    End Sub
 
 End Class

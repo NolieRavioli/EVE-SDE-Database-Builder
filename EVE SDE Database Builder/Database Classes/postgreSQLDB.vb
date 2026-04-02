@@ -1,7 +1,4 @@
-﻿
-Imports System.IO
-Imports Npgsql
-Imports System.Collections.Concurrent
+﻿Imports Npgsql
 
 ''' <summary>
 ''' Class to create a postgreSQLDB and insert data into it.
@@ -9,13 +6,14 @@ Imports System.Collections.Concurrent
 Public Class postgreSQLDB
     Inherits DBFilesBase
 
-    Private ReadOnly BulkInsertTablesData As ConcurrentQueue(Of BulkInsertData)
+    'Private ReadOnly pgSQLBulkInsertTablesData As ConcurrentQueue(Of BulkInsertData)
 
     ' Save the database information for later connections
     Private ReadOnly DBServerName As String
     Private ReadOnly DBUserName As String
     Private ReadOnly DBUserPassword As String
     Private ReadOnly DBPort As String
+    Private ReadOnly InternalDB As New LocalDatabase ' for doing bulk inserts
 
     ' For inserting bulk data imports
     Private Structure BulkInsertData
@@ -40,8 +38,7 @@ Public Class postgreSQLDB
 
         Dim DB As New NpgsqlConnection
 
-        BulkInsertTablesData = New ConcurrentQueue(Of BulkInsertData)
-        CSVDirectory = ""
+        'pgSQLBulkInsertTablesData = New ConcurrentQueue(Of BulkInsertData)
 
         Call InitalizeMainProgressBar(0, "Initializing Database..")
 
@@ -170,18 +167,18 @@ Public Class postgreSQLDB
         ' Get all the PK fields
         For Each F In TableStructure
             If F.IsPrimaryKey Then
-                PKFields.Add(F.FieldName)
+                PKFields.Add($"""{F.FieldName}""")
             End If
         Next
 
         ' Now build the SQL and execute
-        SQL = String.Format("CREATE TABLE ""{0}"" (", TableName)
+        SQL = String.Format("CREATE TABLE public.""{0}"" (", TableName)
 
         ' Add fields
         For Each Field In TableStructure
             With Field
                 ' Add field name
-                SQL &= .FieldName & SPACE
+                SQL &= $"""{Field.FieldName}"" "
 
                 ' Set field length
                 If .FieldLength <> -1 Then
@@ -202,12 +199,14 @@ Public Class postgreSQLDB
                         SQL &= "double precision"
                     Case FieldType.real_type
                         SQL &= "real"
-                    Case FieldType.smallint_type, FieldType.tinyint_type, FieldType.bit_type
+                    Case FieldType.smallint_type, FieldType.tinyint_type
                         SQL &= "smallint"
                     Case FieldType.int_type
                         SQL &= "integer"
                     Case FieldType.bigint_type
                         SQL &= "bigint"
+                    Case FieldType.bit_type
+                        SQL &= "boolean"
                 End Select
 
                 ' If there is only one PK, then set it when creating the table
@@ -215,13 +214,13 @@ Public Class postgreSQLDB
                     SQL &= SPACE & "PRIMARY KEY" & SPACE
                 End If
 
-                If Not .IsNull Or .IsPrimaryKey Then ' All PKs are not null anyway
-                    SQL &= SPACE & "NOT NULL" & COMMA
+                If .IsPrimaryKey OrElse Not .IsNull Then
+                    SQL &= " NOT NULL,"
                 Else
-                    SQL &= COMMA
+                    SQL &= ","
                 End If
 
-                FieldList = FieldList & .FieldName & COMMA
+                FieldList = FieldList & $"""{Field.FieldName}"","
 
             End With
         Next
@@ -246,12 +245,8 @@ Public Class postgreSQLDB
         ' Strip comma
         FieldList = "(" & StripLastCharacter(FieldList) & ")"
 
-        ' Insert the bulk data insert string for bulk insert later
-        Dim TempData As BulkInsertData
-        TempData.BulkImportSQL = String.Format("COPY ""{0}"" FROM '{1}/{0}.csv'  DELIMITER ',' HEADER QUOTE '""' CSV;", TableName, CSVDirectory.Replace("\", "/"))
-        TempData.TableName = TableName
-
-        BulkInsertTablesData.Enqueue(TempData)
+        ' Save this registration
+        InternalDB.RegisterSchema(TableName, TableStructure)
 
     End Sub
 
@@ -278,7 +273,7 @@ Public Class postgreSQLDB
 
         ' Build index fields
         For Each Field In IndexFields
-            SQL &= Field & COMMA
+            SQL &= $"""{Field}"","
         Next
 
         ' Strip the last comman
@@ -294,55 +289,70 @@ Public Class postgreSQLDB
     ''' </summary>
     ''' <param name="TableName">Table to insert records.</param>
     ''' <param name="Record">List of table fields that make up the record.</param>
-    Public Sub InsertRecord(ByVal TableName As String, Record As List(Of DBField))
-        Dim SQL As String
-        Dim Fields As String = ""
-        Dim FieldValues As String = ""
+    Public Sub InsertRecord(ByVal TableName As String, Record As List(Of DBField), Optional ByVal ImmediateInsert As Boolean = False)
 
-        For Each Field In Record
-            Fields = Fields & Field.FieldName & COMMA
-            FieldValues = FieldValues & Field.FieldValue & COMMA
-        Next
+        If ImmediateInsert Then
+            Dim SQL As String
+            Dim Fields As String = ""
+            Dim FieldValues As String = ""
 
-        ' Strip the last commas
-        Fields = Fields.Substring(0, Len(Fields) - 1)
-        FieldValues = FieldValues.Substring(0, Len(FieldValues) - 1)
+            For Each Field In Record
+                Fields = Fields & Field.FieldName & COMMA
+                FieldValues = FieldValues & Field.FieldValue & COMMA
+            Next
 
-        SQL = String.Format("INSERT INTO {0} ({1}) VALUES ({2})", TableName, Fields, FieldValues)
+            ' Strip the last commas
+            Fields = Fields.Substring(0, Len(Fields) - 1)
+            FieldValues = FieldValues.Substring(0, Len(FieldValues) - 1)
 
-        Call ExecuteNonQuerySQL(SQL)
+            SQL = String.Format("INSERT INTO public.""" & "{0}" & """ ({1}) VALUES ({2})", TableName, Fields, FieldValues)
+
+            Call ExecuteNonQuerySQL(SQL)
+        Else
+            ' Save locally for bulk insert
+            Call InternalDB.InsertRecord(TableName, Record)
+        End If
 
     End Sub
 
     ''' <summary>
-    ''' Finalizes the data import. If translation tables were used, they will be imported here.
+    ''' Finalizes the data import.
     ''' </summary>
-    ''' <param name="Translator">YAMLTranslations object to get stored tables from.</param>
-    ''' <param name="TranslationTableImportList">List of translation tables to import.</param>
-    Public Sub FinalizeDataImport(ByRef Translator As YAMLTranslations, ByVal TranslationTableImportList As List(Of String))
-        Dim i As Integer = 0
-
-        Call InitalizeMainProgressBar(BulkInsertTablesData.Count, "Importing Bulk Data...")
-        Try
-            For i = 0 To BulkInsertTablesData.Count - 1
-                Call UpdateMainProgressBar(i, "Bulk Loading " & BulkInsertTablesData(i).TableName & "...")
-                Debug.Print(BulkInsertTablesData(i).TableName)
-                Application.DoEvents()
-
-                Call BeginSQLTransaction()
-                Call ExecuteNonQuerySQL(BulkInsertTablesData(i).BulkImportSQL)
-                Call CommitSQLTransaction()
-
-                ' Since we are done, delete the csv file we just imported
-                Call File.Delete(CSVDirectory & BulkInsertTablesData(i).TableName & ".csv")
-
-            Next
-        Catch ex As Exception
-            MsgBox("Table: " & BulkInsertTablesData(i).TableName & " did not import. Error: " & ex.Message, vbExclamation, Application.ProductName)
-        End Try
+    Public Overrides Sub FinalizeDataImport()
+        Dim Counter As Integer = 0
+        Dim DBRef As NpgsqlConnection = DBConnectionRef(MainDatabase)
+        Dim pgSchema = DBRef.GetSchema("Columns")
 
         Call ClearMainProgressBar()
+        Call InitalizeMainProgressBar(InternalDB.GetTables().Count, "Importing Bulk data...")
 
+        For Each dt As DataTable In InternalDB.GetTables()
+            Call UpdateMainProgressBar(Counter, "Uploading " & dt.TableName)
+            Application.DoEvents()
+            Counter += 1
+
+            Dim copySql = $"COPY ""{dt.TableName}"" ({String.Join(",", dt.Columns.Cast(Of DataColumn).Select(Function(c) $"""{c.ColumnName}"""))}) FROM STDIN (FORMAT BINARY)"
+
+            Using writer = DBRef.BeginBinaryImport(copySql)
+
+                For Each row As DataRow In dt.Rows
+                    writer.StartRow()
+
+                    For Each col As DataColumn In dt.Columns
+                        Dim value = row(col)
+                        Dim pgType = pgSchema.Select($"TABLE_NAME = '{dt.TableName}' AND COLUMN_NAME = '{col.ColumnName}'")(0)("DATA_TYPE")
+
+                        If value Is DBNull.Value Then
+                            writer.WriteNull()
+                        Else
+                            writer.Write(value)
+                        End If
+                    Next
+                Next
+
+                writer.Complete()
+            End Using
+        Next
     End Sub
 
 End Class

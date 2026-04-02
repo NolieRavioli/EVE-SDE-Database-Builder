@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ApplicationSettings.xml>
+  <SDEDirectory>C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\SDE Working\March_31_2026</SDEDirectory>
+  <DatabaseName>March_31_2026</DatabaseName>
+  <FinalDBPath>C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\SDE Working</FinalDBPath>
+  <SQLConnectionString>(localdb)\MSSQLLocalDB</SQLConnectionString>
+  <SQLPassword />
+  <SQLUserName />
+  <AccessPassword />
+  <PostgreSQLConnectionString>localhost</PostgreSQLConnectionString>
+  <PostgreSQLUserName>postgres</PostgreSQLUserName>
+  <PostgreSQLPassword>foobie</PostgreSQLPassword>
+  <PostgreSQLPort>5432</PostgreSQLPort>
+  <MySQLConnectionString />
+  <MySQLUserName />
+  <MySQLPassword />
+  <MySQLPort>3306</MySQLPort>
+  <CSVEUCheck>False</CSVEUCheck>
+  <SelectedLanguage>English</SelectedLanguage>
+  <SelectedDB>SQLite</SelectedDB>
+  <DownloadFolderPath>C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\SDE Working</DownloadFolderPath>
+</ApplicationSettings.xml>

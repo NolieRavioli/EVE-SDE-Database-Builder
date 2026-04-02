@@ -1,7 +1,7 @@
 ﻿
+Imports System.Collections.Concurrent
 Imports System.IO
 Imports MySql.Data.MySqlClient
-Imports System.Collections.Concurrent
 
 ' Class to support MySQL Server Database
 ''' <summary>
@@ -10,7 +10,7 @@ Imports System.Collections.Concurrent
 Public Class MySQLDB
     Inherits DBFilesBase
 
-    Private ReadOnly BulkInsertTablesData As ConcurrentQueue(Of BulkInsertData)
+    Private ReadOnly MySQLBulkInsertTablesData As ConcurrentQueue(Of MySQLBulkInsertData)
 
     ' Save the database information for later connections
     Private ReadOnly DBServerName As String
@@ -21,7 +21,7 @@ Public Class MySQLDB
     Private Const DBConnectionString As String = "Server={0}; userid={1}; password={2}; pooling=false; default command timeout=600; AllowLoadLocalInfile=true;"
 
     ' For doing bulk data inserts
-    Private Structure BulkInsertData
+    Private Structure MySQLBulkInsertData
         Dim BulkImportSQL As String
         Dim TableName As String
     End Structure
@@ -43,7 +43,7 @@ Public Class MySQLDB
         Dim DB As New MySqlConnection
         Dim PortString As String
 
-        BulkInsertTablesData = New ConcurrentQueue(Of BulkInsertData)
+        MySQLBulkInsertTablesData = New ConcurrentQueue(Of MySQLBulkInsertData)
         CSVDirectory = ""
 
         Call InitalizeMainProgressBar(0, "Initializing Database..")
@@ -215,7 +215,7 @@ Public Class MySQLDB
                         SQL &= "DOUBLE"
                     Case FieldType.float_type, FieldType.real_type
                         SQL &= "FLOAT"
-                    Case FieldType.tinyint_type, FieldType.bit_type
+                    Case FieldType.int_type, FieldType.int_type
                         SQL &= "TINYINT UNSIGNED"
                     Case FieldType.smallint_type
                         SQL &= "SMALLINT"
@@ -241,9 +241,11 @@ Public Class MySQLDB
             End With
         Next
 
+        Dim ShortTableName As String = TableName.Replace("`", "")
+
         If PKFields.Count > 0 Then
             ' Create PK constraint here
-            SQL &= String.Format("Constraint {0}_PK PRIMARY KEY CLUSTERED (", TableName)
+            SQL &= String.Format("CONSTRAINT {0}_PK PRIMARY KEY (", ShortTableName)
             For Each PK In PKFields
                 SQL &= PK & COMMA
             Next
@@ -262,14 +264,14 @@ Public Class MySQLDB
         FieldList = "(" & StripLastCharacter(FieldList) & ")"
 
         ' Insert the bulk data insert string for bulk insert later
-        Dim TempData As BulkInsertData
-        TempData.BulkImportSQL = String.Format("LOAD DATA LOCAL INFILE '{0}{1}.csv' INTO TABLE {1} " +
+        Dim TempData As MySQLBulkInsertData
+        TempData.BulkImportSQL = String.Format("LOAD DATA LOCAL INFILE '{0}{1}.csv' INTO TABLE {2} " +
                                  "FIELDS TERMINATED BY ',' ENCLOSED BY '""' " +
-                                 "LINES TERMINATED BY '\r\n' IGNORE 1 LINES {2}",
-                                 CSVDirectory.Replace("\", "/"), TableName, FieldList)
+                                 "LINES TERMINATED BY '\r\n' IGNORE 1 LINES {3}",
+                                 CSVDirectory.Replace("\", "/"), ShortTableName, TableName, FieldList)
         TempData.TableName = TableName
 
-        BulkInsertTablesData.Enqueue(TempData)
+        MySQLBulkInsertTablesData.Enqueue(TempData)
 
     End Sub
 
@@ -332,26 +334,28 @@ Public Class MySQLDB
 
     End Sub
 
+
     ''' <summary>
     ''' Reads the list of tables created in Create Table method and does a CSV insert into the database.
     ''' </summary>
-    Public Sub FinalizeDataImport(ByRef Translator As YAMLTranslations, ByVal TranslationTableImportList As List(Of String))
+    Public Overrides Sub FinalizeDataImport()
 
-        Call InitalizeMainProgressBar(BulkInsertTablesData.Count, "Importing Bulk Data...")
+        Call InitalizeMainProgressBar(MySQLBulkInsertTablesData.Count, "Importing Bulk Data...")
 
-        For i = 0 To BulkInsertTablesData.Count - 1
-            Call UpdateMainProgressBar(i, "Importing " & BulkInsertTablesData(i).TableName & "...")
+        For i = 0 To MySQLBulkInsertTablesData.Count - 1
+            Call UpdateMainProgressBar(i, "Uploading " & MySQLBulkInsertTablesData(i).TableName & "...")
             Application.DoEvents()
+
             Call BeginSQLTransaction()
             Call ExecuteNonQuerySQL("SET GLOBAL local_infile=1;") ' Server setting to allow local uploads of data
-            Call ExecuteNonQuerySQL(String.Format("ALTER TABLE {0} DISABLE KEYS", BulkInsertTablesData(i).TableName))
+            Call ExecuteNonQuerySQL(String.Format("ALTER TABLE {0} DISABLE KEYS", MySQLBulkInsertTablesData(i).TableName))
             Call ExecuteNonQuerySQL("SET autocommit = 1;set unique_checks = 0;set foreign_key_checks = 0;set sql_log_bin=0;")
-            Call ExecuteNonQuerySQL(BulkInsertTablesData(i).BulkImportSQL)
-            Call ExecuteNonQuerySQL(String.Format("ALTER TABLE {0} ENABLE KEYS", BulkInsertTablesData(i).TableName))
+            Call ExecuteNonQuerySQL(MySQLBulkInsertTablesData(i).BulkImportSQL)
+            Call ExecuteNonQuerySQL(String.Format("ALTER TABLE {0} ENABLE KEYS", MySQLBulkInsertTablesData(i).TableName))
             Call CommitSQLTransaction()
 
             ' Since we are done, delete the csv file we just imported
-            Call File.Delete(CSVDirectory & BulkInsertTablesData(i).TableName & ".csv")
+            Call File.Delete(CSVDirectory & MySQLBulkInsertTablesData(i).TableName & ".csv")
 
         Next
 

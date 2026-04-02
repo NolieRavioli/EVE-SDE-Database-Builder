@@ -1,25 +1,20 @@
-﻿Imports System.Xml
-Imports System.IO
+﻿Imports System.IO
+Imports System.Xml
 
 Public Class ProgramSettings
-
-    Public FullAppSettingsFileName As String
-    Private Const AppSettingsFileName As String = "ApplicationSettings"
-    Private Const XMLfileType As String = ".xml"
+    Private Const AppSettingsFileName As String = "ApplicationSettings.xml"
 
     Private Const DefaultSelectedDB As String = "SQLite"
     Private Const DefaultSelectedLanguage As String = "English"
     Private Const DefaultpostgreSQLPort As String = "5432"
     Private Const DefaultMySQLPort As String = "3306"
     Private Const DefaultEUCheck As Boolean = False
-    Private Const DefaultUseLargerVersion As Boolean = False
 
     ' Local version of settings
     Private AppSettings As ApplicationSettings
 
     Public Sub New()
         AppSettings = Nothing
-        FullAppSettingsFileName = AppSettingsFileName & XMLfileType
     End Sub
 
     ''' <summary>
@@ -28,22 +23,21 @@ Public Class ProgramSettings
     ''' <param name="FileName">FileName without XML extension</param>
     ''' <param name="Settings">Settings to save</param>
     ''' <param name="RootName">Root name of the XML file</param>
-    Private Sub WriteSettingsToFile(FileName As String, Settings As Setting(), RootName As String)
+    Private Sub WriteSettingsToFile(FilePath As String, Settings As Setting(), RootName As String)
         Dim i As Integer
-        Dim TempFileName As String = FileName & XMLfileType
 
         ' Create XmlWriterSettings.
         Dim XMLSettings As New XmlWriterSettings With {
             .Indent = True
         }
 
-            ' Delete and make a fresh copy
-        If File.Exists(TempFileName) Then
-            File.Delete(TempFileName)
+        ' Delete and make a fresh copy
+        If File.Exists(FilePath) Then
+            File.Delete(FilePath)
         End If
 
         ' Loop through the settings sent and output each name and value
-        Using writer As XmlWriter = XmlWriter.Create(TempFileName, XMLSettings)
+        Using writer As XmlWriter = XmlWriter.Create(FilePath, XMLSettings)
             writer.WriteStartDocument()
             writer.WriteStartElement(RootName) ' Root.
 
@@ -74,7 +68,7 @@ Public Class ProgramSettings
         Dim TempValue As String
 
         'Load the Xml file
-        m_xmld.Load(FileName & XMLfileType)
+        m_xmld.Load(FileName)
 
         'Get the settings
 
@@ -118,21 +112,6 @@ Public Class ProgramSettings
 
     End Function
 
-    ''' <summary>
-    ''' Just checks if the file exists or not so we don't have to mess with file names
-    ''' </summary>
-    ''' <param name="FileName">Filename to search</param>
-    ''' <returns>True if found, false if not</returns>
-    Private Function FileExists(FileName As String) As Boolean
-
-        If File.Exists(FileName & XMLfileType) Then
-            Return True
-        Else
-            Return False
-        End If
-
-    End Function
-
     Private Structure Setting
         Dim Name As String
         Dim Value As String
@@ -157,32 +136,32 @@ Public Class ProgramSettings
     ' Loads the settings for the user from the DB (for now) for the whole program
     Public Function LoadApplicationSettings() As ApplicationSettings
         Dim TempSettings As ApplicationSettings = Nothing
+        Dim AppSettingsFilePath As String = Path.Combine(EXEFileFolder, AppSettingsFileName)
 
         Try
-            If FileExists(AppSettingsFileName) Then
+            If File.Exists(AppSettingsFilePath) Then
 
                 'Get the settings
                 With TempSettings
-                    .SelectedDB = CStr(GetSettingValue(AppSettingsFileName, SettingTypes.TypeString, AppSettingsFileName, "SelectedDB", DefaultSelectedDB))
-                    .SDEDirectory = CStr(GetSettingValue(AppSettingsFileName, SettingTypes.TypeString, AppSettingsFileName, "SDEDirectory", ""))
-                    .DatabaseName = CStr(GetSettingValue(AppSettingsFileName, SettingTypes.TypeString, AppSettingsFileName, "DatabaseName", ""))
-                    .FinalDBPath = CStr(GetSettingValue(AppSettingsFileName, SettingTypes.TypeString, AppSettingsFileName, "FinalDBPath", ""))
-                    .DownloadFolderPath = CStr(GetSettingValue(AppSettingsFileName, SettingTypes.TypeString, AppSettingsFileName, "DownloadFolderPath", ""))
-                    .SQLConnectionString = CStr(GetSettingValue(AppSettingsFileName, SettingTypes.TypeString, AppSettingsFileName, "SQLConnectionString", ""))
-                    .SQLPassword = CStr(GetSettingValue(AppSettingsFileName, SettingTypes.TypeString, AppSettingsFileName, "SQLPassword", ""))
-                    .SQLUserName = CStr(GetSettingValue(AppSettingsFileName, SettingTypes.TypeString, AppSettingsFileName, "SQLUserName", ""))
-                    .AccessPassword = CStr(GetSettingValue(AppSettingsFileName, SettingTypes.TypeString, AppSettingsFileName, "AccessPassword", ""))
-                    .PostgreSQLConnectionString = CStr(GetSettingValue(AppSettingsFileName, SettingTypes.TypeString, AppSettingsFileName, "PostgreSQLConnectionString", ""))
-                    .PostgreSQLUserName = CStr(GetSettingValue(AppSettingsFileName, SettingTypes.TypeString, AppSettingsFileName, "PostgreSQLUserName", ""))
-                    .PostgreSQLPassword = CStr(GetSettingValue(AppSettingsFileName, SettingTypes.TypeString, AppSettingsFileName, "PostgreSQLPassword", ""))
-                    .PostgreSQLPort = CStr(GetSettingValue(AppSettingsFileName, SettingTypes.TypeString, AppSettingsFileName, "PostgreSQLPort", DefaultpostgreSQLPort))
-                    .MySQLConnectionString = CStr(GetSettingValue(AppSettingsFileName, SettingTypes.TypeString, AppSettingsFileName, "MySQLConnectionString", ""))
-                    .MySQLUserName = CStr(GetSettingValue(AppSettingsFileName, SettingTypes.TypeString, AppSettingsFileName, "MySQLUserName", ""))
-                    .MySQLPassword = CStr(GetSettingValue(AppSettingsFileName, SettingTypes.TypeString, AppSettingsFileName, "MySQLPassword", ""))
-                    .MySQLPort = CStr(GetSettingValue(AppSettingsFileName, SettingTypes.TypeString, AppSettingsFileName, "MySQLPort", DefaultMySQLPort))
-                    .CSVEUCheck = CBool(GetSettingValue(AppSettingsFileName, SettingTypes.TypeBoolean, AppSettingsFileName, "CSVEUCheck", DefaultEUCheck))
-                    .SelectedLanguage = CStr(GetSettingValue(AppSettingsFileName, SettingTypes.TypeString, AppSettingsFileName, "SelectedLanguage", DefaultSelectedLanguage))
-                    .UseLargerVersion = CBool(GetSettingValue(AppSettingsFileName, SettingTypes.TypeBoolean, AppSettingsFileName, "UseLargerVersion", DefaultUseLargerVersion))
+                    .SelectedDB = CStr(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeString, AppSettingsFileName, "SelectedDB", DefaultSelectedDB))
+                    .SDEDirectory = CStr(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeString, AppSettingsFileName, "SDEDirectory", ""))
+                    .DatabaseName = CStr(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeString, AppSettingsFileName, "DatabaseName", ""))
+                    .FinalDBPath = CStr(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeString, AppSettingsFileName, "FinalDBPath", ""))
+                    .DownloadFolderPath = CStr(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeString, AppSettingsFileName, "DownloadFolderPath", ""))
+                    .SQLConnectionString = CStr(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeString, AppSettingsFileName, "SQLConnectionString", ""))
+                    .SQLPassword = CStr(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeString, AppSettingsFileName, "SQLPassword", ""))
+                    .SQLUserName = CStr(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeString, AppSettingsFileName, "SQLUserName", ""))
+                    .AccessPassword = CStr(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeString, AppSettingsFileName, "AccessPassword", ""))
+                    .PostgreSQLConnectionString = CStr(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeString, AppSettingsFileName, "PostgreSQLConnectionString", ""))
+                    .PostgreSQLUserName = CStr(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeString, AppSettingsFileName, "PostgreSQLUserName", ""))
+                    .PostgreSQLPassword = CStr(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeString, AppSettingsFileName, "PostgreSQLPassword", ""))
+                    .PostgreSQLPort = CStr(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeString, AppSettingsFileName, "PostgreSQLPort", DefaultpostgreSQLPort))
+                    .MySQLConnectionString = CStr(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeString, AppSettingsFileName, "MySQLConnectionString", ""))
+                    .MySQLUserName = CStr(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeString, AppSettingsFileName, "MySQLUserName", ""))
+                    .MySQLPassword = CStr(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeString, AppSettingsFileName, "MySQLPassword", ""))
+                    .MySQLPort = CStr(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeString, AppSettingsFileName, "MySQLPort", DefaultMySQLPort))
+                    .CSVEUCheck = CBool(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeBoolean, AppSettingsFileName, "CSVEUCheck", DefaultEUCheck))
+                    .SelectedLanguage = CStr(GetSettingValue(AppSettingsFilePath, SettingTypes.TypeString, AppSettingsFileName, "SelectedLanguage", DefaultSelectedLanguage))
                 End With
 
             Else
@@ -226,7 +205,6 @@ Public Class ProgramSettings
             .MySQLPassword = ""
             .MySQLPort = DefaultMySQLPort
             .CSVEUCheck = DefaultEUCheck
-            .UseLargerVersion = DefaultUseLargerVersion
             .SelectedLanguage = DefaultSelectedLanguage
             .DownloadFolderPath = ""
         End With
@@ -239,7 +217,7 @@ Public Class ProgramSettings
 
     ' Saves the application settings to XML
     Public Sub SaveApplicationSettings(SentSettings As ApplicationSettings)
-        Dim ApplicationSettingsList(19) As Setting
+        Dim ApplicationSettingsList(18) As Setting
 
         Try
             With SentSettings
@@ -262,10 +240,9 @@ Public Class ProgramSettings
                 ApplicationSettingsList(16) = New Setting("SelectedLanguage", .SelectedLanguage)
                 ApplicationSettingsList(17) = New Setting("SelectedDB", .SelectedDB)
                 ApplicationSettingsList(18) = New Setting("DownloadFolderPath", .DownloadFolderPath)
-                ApplicationSettingsList(19) = New Setting("UseLargerVersion", .UseLargerVersion)
             End With
 
-            Call WriteSettingsToFile(AppSettingsFileName, ApplicationSettingsList, AppSettingsFileName)
+            Call WriteSettingsToFile(Path.Combine(EXEFileFolder, AppSettingsFileName), ApplicationSettingsList, AppSettingsFileName)
 
         Catch ex As Exception
             MsgBox("An error occured when saving Application Settings. Error: " & Err.Description & vbCrLf & "Settings not saved.", vbExclamation, Application.ProductName)
@@ -290,7 +267,7 @@ Public Structure ApplicationSettings
     Dim SDEDirectory As String
     Dim DatabaseName As String
 
-    ' Used for all Access, SQLite, and CSV dbs
+    ' Used for all Access, SQLite, CSV, and JSON outputs
     Dim FinalDBPath As String
 
     ' Where we download the SDE to 
@@ -313,8 +290,6 @@ Public Structure ApplicationSettings
     Dim MySQLPort As String
 
     Dim CSVEUCheck As Boolean
-
-    Dim UseLargerVersion As Boolean
 
     Dim SelectedLanguage As String
 

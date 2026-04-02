@@ -1,7 +1,6 @@
 ﻿
 Imports System.IO
 Imports Microsoft.Office.Interop.Access.Dao
-Imports System.Collections.Concurrent
 
 ''' <summary>
 ''' Class to create a Microsoft Access database and insert data into it.
@@ -11,8 +10,6 @@ Public Class msAccessDB
 
     Private ReadOnly DB As Database
     Private ReadOnly DBE As DBEngine
-
-    Private ReadOnly BulkInsertTablesData As ConcurrentQueue(Of BulkInsertData)
 
     ' For inserting bulk data
     Private Structure BulkInsertData
@@ -34,8 +31,6 @@ Public Class msAccessDB
         Call InitalizeMainProgressBar(0, "Initializing Database..")
 
         DBE = New DBEngine
-        BulkInsertTablesData = New ConcurrentQueue(Of BulkInsertData)
-        CSVDirectory = ""
 
         Dim PasswordString As String = ""
         If Trim(DBPassword) <> "" Then
@@ -64,14 +59,6 @@ Public Class msAccessDB
             Success = False
         End Try
 
-    End Sub
-
-    ''' <summary>
-    ''' Closes the reference database and finalizes the class.
-    ''' </summary>
-    Protected Overrides Sub Finalize()
-        Call CloseDB()
-        MyBase.Finalize()
     End Sub
 
     ''' <summary>
@@ -176,7 +163,7 @@ Public Class msAccessDB
                 SQL &= "[" & .FieldName & "]" & SPACE
 
                 ' Set field length
-                If .FieldLength = YAMLFilesBase.MaxFieldLen Then
+                If .FieldLength = SDEFilesBase.MaxFieldLen Then
                     FieldLength = "max"
                 Else
                     FieldLength = CStr(.FieldLength)
@@ -196,10 +183,10 @@ Public Class msAccessDB
                     Case FieldType.double_type, FieldType.float_type, FieldType.real_type
                         SQL &= "Double"
                         SchemaType = "Double"
-                    Case FieldType.bit_type
+                    Case FieldType.int_type
                         SQL &= "YesNo"
                         SchemaType = "Bit"
-                    Case FieldType.int_type, FieldType.tinyint_type, FieldType.smallint_type
+                    Case FieldType.int_type, FieldType.int_type, FieldType.smallint_type
                         SQL &= "Integer"
                         SchemaType = "Integer"
                     Case FieldType.bigint_type
@@ -251,16 +238,6 @@ Public Class msAccessDB
             ' Create a unique index now with multiple PK fields for SQLite
             Call CreateIndex(TableName, "IDX_" & TableName & "_TID_EID", PKFields, True)
         End If
-
-        ' Strip comma
-        FieldList = StripLastCharacter(FieldList)
-
-        ' Insert the bulk data insert string for bulk insert later
-        Dim TempData As BulkInsertData
-        TempData.TableSQL = String.Format("INSERT INTO {0} ({1}) SELECT {1} FROM [Text;FMT=CSVDelimited;HDR=Yes;Database={2}].[{0}.csv]", TableName, FieldList, CSVDirectory)
-        TempData.SchemaFile = SchemaString
-
-        BulkInsertTablesData.Enqueue(TempData)
 
     End Sub
 
@@ -317,36 +294,6 @@ Public Class msAccessDB
         FieldValues = FieldValues.Substring(0, Len(FieldValues) - 1)
 
         Call ExecuteNonQuerySQL(String.Format("INSERT INTO {0} ({1}) VALUES ({2})", TableName, Fields, FieldValues))
-
-    End Sub
-
-    ''' <summary>
-    ''' Finalizes the data import. If translation tables were used, they will be imported here.
-    ''' </summary>
-    ''' <param name="Translator">YAMLTranslations object to get stored tables from.</param>
-    ''' <param name="TranslationTableImportList">List of translation tables to import.</param>
-    Public Sub FinalizeDataImport(ByRef Translator As YAMLTranslations, ByVal TranslationTableImportList As List(Of String))
-        ' Build the schema.ini data for this table to import with text bulk
-        Dim TableStream As StreamWriter
-
-        ' Insert each table
-        For Each TableData In BulkInsertTablesData
-            TableStream = File.CreateText(CSVDirectory & "\Schema.ini")
-            TableStream.WriteLine(TableData.SchemaFile)
-            TableStream.Flush()
-            TableStream.Close()
-            TableStream.Dispose()
-
-            ' Bulk insert the data and commit each insert instead of using a transaction
-            Call ExecuteNonQuerySQL(TableData.TableSQL)
-            Call DBE.Idle()
-
-            ' Remove schema file 
-            Call File.Delete(CSVDirectory & "\Schema.ini")
-
-            Application.DoEvents()
-
-        Next
 
     End Sub
 

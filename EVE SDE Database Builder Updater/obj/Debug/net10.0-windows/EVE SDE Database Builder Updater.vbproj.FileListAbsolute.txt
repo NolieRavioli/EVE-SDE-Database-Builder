@@ -1,0 +1,35 @@
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder-Upgrade\Root Directory\net10.0-windows\EVE SDE Database Builder Updater.exe
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder-Upgrade\Root Directory\net10.0-windows\EVE SDE Database Builder Updater.deps.json
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder-Upgrade\Root Directory\net10.0-windows\EVE SDE Database Builder Updater.runtimeconfig.json
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder-Upgrade\Root Directory\net10.0-windows\EVE SDE Database Builder Updater.dll
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder-Upgrade\Root Directory\net10.0-windows\EVE SDE Database Builder Updater.pdb
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder-Upgrade\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE_SDE_Database_Builder_Updater_2.frmNotify.resources
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder-Upgrade\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE_SDE_Database_Builder_Updater_2.frmUpdaterMain.resources
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder-Upgrade\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE SDE Database Builder Updater.vbproj.GenerateResource.cache
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder-Upgrade\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE SDE Database Builder Updater.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder-Upgrade\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE SDE Database Builder Updater.AssemblyInfoInputs.cache
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder-Upgrade\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE SDE Database Builder Updater.AssemblyInfo.vb
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder-Upgrade\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE SDE Database Builder Updater.vbproj.CoreCompileInputs.cache
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder-Upgrade\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE SDE Database Builder Updater.dll
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder-Upgrade\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\refint\EVE SDE Database Builder Updater.dll
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder-Upgrade\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE SDE Database Builder Updater.pdb
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder-Upgrade\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE SDE Database Builder Updater.genruntimeconfig.cache
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder-Upgrade\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\ref\EVE SDE Database Builder Updater.dll
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE_SDE_Database_Builder_Updater_2.frmNotify.resources
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE_SDE_Database_Builder_Updater_2.frmUpdaterMain.resources
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE SDE Database Builder Updater.vbproj.GenerateResource.cache
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE SDE Database Builder Updater.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE SDE Database Builder Updater.AssemblyInfoInputs.cache
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE SDE Database Builder Updater.AssemblyInfo.vb
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE SDE Database Builder Updater.vbproj.CoreCompileInputs.cache
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE SDE Database Builder Updater.sourcelink.json
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE SDE Database Builder Updater.dll
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\refint\EVE SDE Database Builder Updater.dll
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE SDE Database Builder Updater.pdb
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\EVE SDE Database Builder Updater.genruntimeconfig.cache
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\EVE SDE Database Builder Updater\obj\Debug\net10.0-windows\ref\EVE SDE Database Builder Updater.dll
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\Root Directory\net10.0-windows\EVE SDE Database Builder Updater.exe
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\Root Directory\net10.0-windows\EVE SDE Database Builder Updater.deps.json
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\Root Directory\net10.0-windows\EVE SDE Database Builder Updater.runtimeconfig.json
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\Root Directory\net10.0-windows\EVE SDE Database Builder Updater.dll
+C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\Root Directory\net10.0-windows\EVE SDE Database Builder Updater.pdb

@@ -1,6 +1,7 @@
 ﻿
 Imports System.Data.SQLite
 Imports System.IO
+Imports Mysqlx.XDevAPI.Relational
 
 ''' <summary>
 ''' Class to create a SQLite Database and insert data into it.
@@ -60,28 +61,6 @@ Public Class SQLiteDB
     End Sub
 
     ''' <summary>
-    ''' Opens a new database connection for reference and returns it.
-    ''' </summary>
-    ''' <returns>Returns a SQLiteConnection for use.</returns>
-    Private Function DBConnectionRef() As SQLiteConnection
-        Dim DBRef As New SQLiteConnection With {
-            .ConnectionString = "Data Source=" & DBFileNameandPath & ";Version=3;"
-        }
-        DBRef.Open()
-
-        Return DBRef
-
-    End Function
-
-    ''' <summary>
-    ''' Closes the reference database and finalizes the class.
-    ''' </summary>
-    Protected Overrides Sub Finalize()
-        Call CloseDB()
-        MyBase.Finalize()
-    End Sub
-
-    ''' <summary>
     ''' Closes and disposes the local database variable.
     ''' </summary>
     Public Sub CloseDB()
@@ -131,7 +110,8 @@ Public Class SQLiteDB
     ''' <param name="SelectTableName">Table name to select from</param>
     ''' <param name="SelectWhereClause">List of where clauses such as WHERE Y = 3</param>
     ''' <returns>List of objects to match the field values</returns>
-    Public Function SelectfromTable(ByVal SelectFieldValues As List(Of String), ByVal SelectTableName As String, ByVal SelectWhereClause As List(Of String),
+    Public Function SelectfromTable(ByVal SelectFieldValues As List(Of String), ByVal SelectTableName As String,
+                                    Optional ByVal SelectWhereClause As List(Of String) = Nothing,
                                     Optional ByRef RecordsFound As Boolean = False) As List(Of List(Of Object))
         Dim SQLQuery As SQLiteCommand
         Dim SQLReader As SQLiteDataReader
@@ -265,9 +245,9 @@ Public Class SQLiteDB
                         SQL &= "FLOAT"
                     Case FieldType.real_type
                         SQL &= "REAL"
-                    Case FieldType.bit_type
+                    Case FieldType.int_type
                         SQL &= "INTEGER"
-                    Case FieldType.tinyint_type
+                    Case FieldType.int_type
                         SQL &= "TINYINT"
                     Case FieldType.smallint_type
                         SQL &= "SMALLINT"
@@ -314,7 +294,7 @@ Public Class SQLiteDB
     ''' <param name="Clustered">Optional value - If the index is clustered or unclustered (not used).</param>
     Public Sub CreateIndex(ByVal TableName As String, ByVal IndexName As String, IndexFields As List(Of String),
                            Optional Unique As Boolean = False, Optional Clustered As Boolean = False)
-dim SQL As string
+        Dim SQL As String
 
         SQL = "CREATE" & SPACE
 
@@ -366,57 +346,110 @@ dim SQL As string
     End Sub
 
     ''' <summary>
-    ''' Finalizes the data import. If translation tables were used, they will be imported here.
+    '''  Sets the names of Stars, Planets, Moons, Asteroid Belts, Stations, and Stargates with this schema
+    '''  https://developers.eveonline.com/docs/services/static-data/#automation
     ''' </summary>
-    ''' <param name="Translator">YAMLTranslations object to get stored tables from.</param>
-    ''' <param name="TranslationTableImportList">List of translation tables to import.</param>
-    Public Sub FinalizeDataImport(ByRef Translator As YAMLTranslations, ByVal TranslationTableImportList As List(Of String))
-        Dim Tables As List(Of DataTable) = Translator.TranslationTables.GetTables
-        Dim Counter As Integer
+    Public Sub SetCelestialNames()
+        Dim SQL As String
 
-        ' Import the translation tables only if they were selected - otherwise skip
-        For i = 0 To Translator.TranslationTables.GetTables.Count - 1
-            If TranslationTableImportList.Contains(Tables(i).TableName) Then
+        ' Stars and stargates are set to the solarSystemName, so update first
+        SQL = "UPDATE mapStargates SET stargateName = (SELECT solarSystemName FROM mapSolarSystems "
+        SQL &= "WHERE mapSolarSystems.solarSystemID = mapStargates.destinationSolarSystemID) "
+        SQL &= "WHERE EXISTS (SELECT 1 FROM mapSolarSystems WHERE mapSolarSystems.solarSystemID = mapStargates.solarSystemID)"
+        ExecuteNonQuerySQL(SQL)
 
-                Counter = 0
-                Call InitalizeMainProgressBar(Tables(i).Rows.Count + 1, "Importing Translation data...")
+        SQL = "UPDATE mapStars SET starName = (SELECT solarSystemName FROM mapSolarSystems "
+        SQL &= "WHERE mapSolarSystems.solarSystemID = mapStars.solarSystemID) "
+        SQL &= "WHERE EXISTS (SELECT 1 FROM mapSolarSystems WHERE mapSolarSystems.solarSystemID = mapStars.solarSystemID)"
+        ExecuteNonQuerySQL(SQL)
 
-                For Each row As DataRow In Tables(i).Rows
-                    Dim DataFields As New List(Of DBField)
+        ' The rest of the updates concatenates fields but each are different operators, so select here
+        Dim ConcatOperator As String = "||"
 
-                    If Counter < Tables(i).Rows.Count Then
-                        Call UpdateMainProgressBar(Counter, "Importing " & Tables(i).TableName)
-                    End If
-                    If Tables(i).TableName = YAMLTranslations.trnTranslationColumnsTable Then
-                        DataFields.Add(BuildDatabaseField("columnName", CType(row.Item(0), Object), FieldType.nvarchar_type))
-                        DataFields.Add(BuildDatabaseField("masterID", CType(row.Item(1), Object), FieldType.nvarchar_type))
-                        DataFields.Add(BuildDatabaseField("tableName", CType(row.Item(2), Object), FieldType.nvarchar_type))
-                        DataFields.Add(BuildDatabaseField("tcGroupID", CType(row.Item(3), Object), FieldType.smallint_type))
-                        DataFields.Add(BuildDatabaseField("tcID", CType(row.Item(4), Object), FieldType.smallint_type))
+        ' Planets orbit stars, so it's <starName> <celestialIndex>
+        ' First set up the roman look up table
+        Call CreateRomanNumberTable()
+        SQL = "UPDATE mapPlanets SET planetName = (SELECT starName FROM mapStars "
+        SQL &= "WHERE mapStars.starID = mapPlanets.orbitID)" & ConcatOperator & "' '" & ConcatOperator
+        SQL &= "(SELECT roman FROM RomanLookup WHERE RomanLookup.value = mapPlanets.celestialIndex)"
+        ExecuteNonQuerySQL(SQL)
 
-                    ElseIf Tables(i).TableName = YAMLTranslations.trnTranslationLanguagesTable Then
-                        DataFields.Add(BuildDatabaseField("languageID", CType(row.Item(0), Object), FieldType.varchar_type))
-                        DataFields.Add(BuildDatabaseField("languageName", CType(row.Item(1), Object), FieldType.nvarchar_type))
+        ' Moons orbit planets
+        SQL = "UPDATE mapMoons SET moonName = (SELECT planetName FROM mapPlanets  "
+        SQL &= "WHERE mapPlanets.planetID = mapMoons.orbitID)" & ConcatOperator
+        SQL &= "' - Moon '" & ConcatOperator & "mapMoons.orbitIndex"
+        ExecuteNonQuerySQL(SQL)
 
-                    ElseIf Tables(i).TableName = YAMLTranslations.trnTranslationsTable Then
-                        DataFields.Add(BuildDatabaseField("keyID", CType(row.Item(0), Object), FieldType.int_type))
-                        DataFields.Add(BuildDatabaseField("languageID", CType(row.Item(1), Object), FieldType.varchar_type))
-                        DataFields.Add(BuildDatabaseField("tcID", CType(row.Item(2), Object), FieldType.smallint_type))
-                        DataFields.Add(BuildDatabaseField("text", CType(row.Item(3), Object), FieldType.nvarchar_type))
-                    End If
+        ' Belts orbit planets
+        SQL = "UPDATE mapAsteroidBelts SET asteroidBeltName = (SELECT planetName FROM mapPlanets  "
+        SQL &= "WHERE mapPlanets.planetID = mapAsteroidBelts.orbitID)" & ConcatOperator
+        SQL &= "' - Asteroid Belt '" & ConcatOperator & "mapAsteroidBelts.orbitIndex"
+        ExecuteNonQuerySQL(SQL)
 
-                    Call InsertRecord(Tables(i).TableName, DataFields)
-                    Counter += 1
-                    Application.DoEvents()
-                Next
+        ' Stations orbit planets and moons, plus they have the corporation name and operation name if useOperationName is true
+        SQL = "UPDATE npcStations SET stationName = (SELECT planetName FROM mapPlanets "
+        SQL &= "WHERE mapPlanets.planetID = npcStations.orbitID) " & ConcatOperator & "' - '" & ConcatOperator
+        SQL &= "(SELECT corporationName FROM npcCorporations WHERE npcCorporations.corporationID = npcStations.ownerID) "
+        SQL &= "WHERE useOperationName = 0 AND stationName is NULL"
+        ExecuteNonQuerySQL(SQL)
 
-            Else
-                ' Drop the table
-                Call DropTable(Tables(i).TableName)
-            End If
+        SQL = "UPDATE npcStations SET stationName = (SELECT planetName FROM mapPlanets "
+        SQL &= "WHERE mapPlanets.planetID = npcStations.orbitID) " & ConcatOperator & "' - '" & ConcatOperator
+        SQL &= "(SELECT corporationName FROM npcCorporations WHERE npcCorporations.corporationID = npcStations.ownerID)" & ConcatOperator & " ' ' " & ConcatOperator
+        SQL &= "(SELECT operationName FROM stationOperations WHERE stationOperations.operationID = npcStations.operationID)"
+        SQL &= "WHERE useOperationName = 1 AND stationName is NULL"
+        ExecuteNonQuerySQL(SQL)
+
+        ' now moons
+        SQL = "UPDATE npcStations SET stationName = (SELECT moonName FROM mapMoons "
+        SQL &= "WHERE mapMoons.moonID = npcStations.orbitID) " & ConcatOperator
+        SQL &= "(SELECT moonName FROM mapMoons WHERE mapMoons.moonID = npcStations.orbitID)" & ConcatOperator & "' - '" & ConcatOperator
+        SQL &= "(SELECT corporationName FROM npcCorporations WHERE npcCorporations.corporationID = npcStations.ownerID) "
+        SQL &= "WHERE useOperationName = 0 AND stationName is NULL"
+        ExecuteNonQuerySQL(SQL)
+
+        SQL = "UPDATE npcStations SET stationName = (SELECT moonName FROM mapMoons "
+        SQL &= "WHERE mapMoons.moonID = npcStations.orbitID) " & ConcatOperator & "' - '" & ConcatOperator
+        SQL &= "(SELECT corporationName FROM npcCorporations WHERE npcCorporations.corporationID = npcStations.ownerID) " & ConcatOperator & " ' ' " & ConcatOperator
+        SQL &= "(SELECT operationName FROM stationOperations WHERE stationOperations.operationID = npcStations.operationID)"
+        SQL &= "WHERE useOperationName = 1 AND stationName is NULL"
+        ExecuteNonQuerySQL(SQL)
+
+        ' and one (at the time of this change) orbited a star
+        SQL = "UPDATE npcStations SET stationName = (SELECT starName FROM mapStars "
+        SQL &= "WHERE mapStars.starID = npcStations.orbitID) " & ConcatOperator & "' - '" & ConcatOperator
+        SQL &= "(SELECT corporationName FROM npcCorporations WHERE npcCorporations.corporationID = npcStations.ownerID) "
+        SQL &= "WHERE useOperationName = 0 AND stationName is NULL"
+        ExecuteNonQuerySQL(SQL)
+
+        SQL = "UPDATE npcStations SET stationName = (SELECT starName FROM mapStars "
+        SQL &= "WHERE mapStars.starID = npcStations.orbitID) " & ConcatOperator & "' - '" & ConcatOperator
+        SQL &= "(SELECT corporationName FROM npcCorporations WHERE npcCorporations.corporationID = npcStations.ownerID)" & ConcatOperator & " ' ' " & ConcatOperator
+        SQL &= "(SELECT operationName FROM stationOperations WHERE stationOperations.operationID = npcStations.operationID)"
+        SQL &= "WHERE useOperationName = 1 AND stationName is NULL"
+        ExecuteNonQuerySQL(SQL)
+
+        ' don't need this anymore
+        Call DropTable("RomanLookup")
+
+    End Sub
+
+    Public Sub CreateRomanNumberTable()
+        Dim DataFields As New List(Of DBField)
+        Dim Table As New List(Of DBTableField) From {
+            New DBTableField("value", FieldType.int_type, 0, False, True),
+            New DBTableField("roman", FieldType.nvarchar_type, 10, True)
+        }
+        Call CreateTable("RomanLookup", Table)
+
+        ' Insert Data for 50 numbers
+        For i = 1 To 50
+            DataFields = New List(Of DBField) From {
+                BuildDatabaseField("value", i, FieldType.int_type),
+                BuildDatabaseField("roman", ToRoman(i), FieldType.nvarchar_type)
+            }
+            Call InsertRecord("RomanLookup", DataFields)
         Next
-
-        Call ClearMainProgressBar()
 
     End Sub
 
