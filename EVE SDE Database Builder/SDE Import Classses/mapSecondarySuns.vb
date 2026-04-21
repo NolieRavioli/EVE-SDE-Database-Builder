@@ -96,7 +96,7 @@ Public Class secondSun
     Public Property _key As Long
     Public Property effectBeaconTypeID As Long
     Public Property position As celestialposition
-    Public Property solarSystemID As starStatistic
+    Public Property solarSystemID As Long
     Public Property typeID As Integer
 End Class
 
