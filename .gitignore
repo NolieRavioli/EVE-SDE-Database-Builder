@@ -1,0 +1,64 @@
+# ---- Build output ----
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+# ---- Visual Studio / Rider IDE state ----
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# ---- Per-user / machine-specific project bits ----
+*.vbproj.user
+*.csproj.user
+*.fsproj.user
+*.pubxml.user
+**/My Project/launchSettings.json
+**/Properties/launchSettings.json
+
+# ---- NuGet ----
+*.nupkg
+*.snupkg
+**/packages/*
+!**/packages/build/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# ---- ReSharper / Rider ----
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# ---- Test results / coverage ----
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# ---- OS junk ----
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# ---- Editor ----
+*.swp
+*.swo
+*~
+
+# ---- Local SDE working data (don't commit downloaded SDE dumps) ----
+sde-cache/
+LatestBuild
+LastBuild.txt
+*.sqlite
+*.sqlite-journal

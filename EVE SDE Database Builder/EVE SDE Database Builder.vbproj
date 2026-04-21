@@ -12,14 +12,6 @@
 	<EnableSdkPublish>true</EnableSdkPublish>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <OutputPath>C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\Root Directory</OutputPath>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <OutputPath>C:\Users\brian\OneDrive\EVE Stuff\EVE IPH Projects\EVE-SDE-Database-Builder\Root Directory</OutputPath>
-  </PropertyGroup>
-
   <ItemGroup>
     <Content Include="2876_64.ico" />
   </ItemGroup>
