@@ -2223,8 +2223,13 @@ CancelImportProcessing:
             Call CreateNewDirectory(NewDownloadDirectory)
 
             ' Now download the zip and extract into that folder
+            ' Use the build number returned by latest.jsonl so we always pull the matching SDE archive,
+            ' rather than a stale hard-coded build.
             lblStatus.Text = "Downloading SDE..."
-            Call DownloadFileFromServer("https://developers.eveonline.com/static-data/tranquility/eve-online-static-data-3241024-jsonl.zip", NewDownloadDirectory & "\SDE.zip", Nothing, pgBar)
+            Dim SDEZipURL As String = String.Format(
+                "https://developers.eveonline.com/static-data/tranquility/eve-online-static-data-{0}-jsonl.zip",
+                NewBuildData.BuildNumber)
+            Call DownloadFileFromServer(SDEZipURL, NewDownloadDirectory & "\SDE.zip", Nothing, pgBar)
 
             If CancelDownload Then
                 ' Delete new BuildData and restore old one
